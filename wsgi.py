@@ -24,7 +24,7 @@ class WSGIServer(object):
 
         host, port = sock.getsockname()[:2]
         WSGIServer.server_name = socket.getfqdn(host)
-        WSGIServer.server_port = port
+        WSGIServer.server_port = str(port)
         self.raw_data = None
         self.status = 200
         self.response_headers = []
@@ -47,12 +47,15 @@ class WSGIServer(object):
 
     def finish_response(self, client_connection, result):
         try:
-            response = 'HTTP/1.1 {status}\r\n'.format(status=self.status)
+            # TODO: 是否有更好的处理bytes的方法
+            response = bytes('HTTP/1.1 {status}\r\n'.format(status=self.status), encoding="utf-8")
             for header in self.response_headers:
-                response += '{0}: {1}\r\n'.format(*header)
-            response += '\r\n'
-            response += result
-            client_connection.sendall(bytes(response, encoding="utf-8"))
+                response += bytes('{0}: {1}\r\n'.format(*header), encoding="utf-8")
+            response += bytes('\r\n', encoding="utf-8")
+            # result为一个迭代器，而不一定string或者byte
+            for data in result:
+                response += data
+            client_connection.sendall(response)
         finally:
             client_connection.close()
 
@@ -87,7 +90,7 @@ class WSGIServer(object):
     @staticmethod
     def parse_parameter(path):
         if "?" not in path:
-            return path, {}
+            return path, ""
 
         path, parameter_str = path.split("?")
         return path, parameter_str
@@ -100,10 +103,19 @@ class WSGIServer(object):
 
 
 if __name__ == "__main__":
-    def application(environ, start_response):
-        start_response('200 OK', [('Content-Type', 'text/html')])
-        return "<h1>Hello, web!</h1>"
+    from flask import Flask
+    from flask import Response
+
+    flask_app = Flask(__name__)
 
 
-    server = WSGIServer(("0.0.0.0", 9000), application)
+    @flask_app.route('/hello')
+    def hello_world():
+        return Response(
+            'hello',
+            mimetype='text/plain'
+        )
+
+
+    server = WSGIServer(("0.0.0.0", 9000), flask_app.wsgi_app)
     server.serve_forever()
