@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import socket
 import sys
 from io import StringIO
+from wsgiref.validate import validator
 
 BUFFER_SIZE = 4096
 
@@ -55,6 +56,8 @@ class WSGIServer(object):
             # result为一个迭代器，而不一定string或者byte
             for data in result:
                 response += data
+            # 迭代器必须关闭？ 为啥?
+            result.close()
             client_connection.sendall(response)
         finally:
             client_connection.close()
@@ -67,11 +70,10 @@ class WSGIServer(object):
         # 第一行为 'method path version'
         method, url, http_version = format_data[0].split()
         path, query_str = WSGIServer.parse_parameter(url)
-        # base on PEP333
         # https://www.python.org/dev/peps/pep-0333/#environ-variables
         environ = {
             "REQUEST_METHOD": method,
-            # "SCRIPT_NAME": "",
+            "SCRIPT_NAME": "",
             "PATH_INFO": path,
             "QUERY_STRING": query_str,
             # "CONTENT_TYPE": "text/plain",
@@ -98,19 +100,18 @@ class WSGIServer(object):
 
 
 if __name__ == "__main__":
-    from flask import Flask
-    from flask import Response
+    @validator
+    def application(environ, start_response):
+        data = b'Hello, World!\n'
+        status = '200 OK'
 
-    flask_app = Flask(__name__)
+        response_headers = [
+            ('Content-type', 'text/plain'),
+            ('Content-Length', str(len(data))),
+        ]
+        start_response(status, response_headers)
+        return iter([data])
 
 
-    @flask_app.route('/hello')
-    def hello_world():
-        return Response(
-            'hello',
-            mimetype='text/plain'
-        )
-
-
-    server = WSGIServer(("0.0.0.0", 9000), flask_app.wsgi_app)
+    server = WSGIServer(("0.0.0.0", 9000), application)
     server.serve_forever()
