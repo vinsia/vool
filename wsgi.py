@@ -67,6 +67,8 @@ class WSGIServer(object):
         # 第一行为 'method path version'
         method, url, http_version = format_data[0].split()
         path, query_str = WSGIServer.parse_parameter(url)
+        # base on PEP333
+        # https://www.python.org/dev/peps/pep-0333/#environ-variables
         environ = {
             "REQUEST_METHOD": method,
             # "SCRIPT_NAME": "",
@@ -76,7 +78,6 @@ class WSGIServer(object):
             "SERVER_NAME": WSGIServer.server_name,
             "SERVER_PORT": WSGIServer.server_port,
             "SERVER_PROTOCOL": http_version,
-
             "wsgi.version": (1, 0),
             "wsgi.url_scheme": "http",
             "wsgi.input": StringIO(data),
@@ -94,12 +95,6 @@ class WSGIServer(object):
 
         path, parameter_str = path.split("?")
         return path, parameter_str
-        # parameter = {}
-        # parameter_str = parameter_str.lstrip("?")
-        # for parameter_s in parameter_str.split("&"):
-        #     key, value = parameter_s.split("=")
-        #     parameter[key] = value
-        # return path, parameter
 
 
 if __name__ == "__main__":
