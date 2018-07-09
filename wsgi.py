@@ -6,6 +6,8 @@ import sys
 from io import StringIO
 from wsgiref.validate import validator
 
+from multiprocessing import Process
+
 BUFFER_SIZE = 4096
 
 
@@ -66,7 +68,7 @@ class WSGIServer(object):
         data = self.raw_data.decode("utf-8")
         format_data = data.splitlines()
 
-        print(format_data)
+        # print(format_data)
         # 第一行为 'method path version'
         method, url, http_version = format_data[0].split()
         path, query_str = WSGIServer.parse_parameter(url)
@@ -114,4 +116,8 @@ if __name__ == "__main__":
 
 
     server = WSGIServer(("0.0.0.0", 9000), application)
-    server.serve_forever()
+    p = Process(target=server.serve_forever, args=())
+    p.start()
+    p.join()
+    # server = WSGIServer(("0.0.0.0", 9000), application)
+    # server.serve_forever()

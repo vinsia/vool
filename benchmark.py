@@ -18,11 +18,12 @@ def _measure():
             print(count, time.time() - start)
 
 
-def test_wsgi_flask():
+if __name__ == "__main__":
     from flask import Flask
     from flask import Response
 
     flask_app = Flask(__name__)
+
 
     @flask_app.route('/hello')
     def hello_world():
@@ -30,6 +31,7 @@ def test_wsgi_flask():
             'hello',
             mimetype='text/plain'
         )
+
 
     server = WSGIServer(("0.0.0.0", 9000), flask_app.wsgi_app)
     s_p = Process(target=server.serve_forever, args=())
