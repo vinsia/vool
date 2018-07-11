@@ -1,10 +1,37 @@
 # -*- coding:utf-8 -*-
 from __future__ import unicode_literals
 
+import os
+import sys
 import time
 from multiprocessing import Process
 
 from wsgi import WSGIServer
+
+
+def daemonize() -> None:
+    """Move current process to daemon process."""
+    # Create first fork
+    pid = os.fork()
+    if pid > 0:
+        sys.exit(0)
+
+    # Decouple fork
+    os.setsid()
+
+    # Create second fork
+    pid = os.fork()
+    if pid > 0:
+        sys.exit(0)
+
+    # redirect standard file descriptors to devnull
+    infd = open(os.devnull, 'r')
+    outfd = open(os.devnull, 'a+')
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os.dup2(infd.fileno(), sys.stdin.fileno())
+    os.dup2(outfd.fileno(), sys.stdout.fileno())
+    os.dup2(outfd.fileno(), sys.stderr.fileno())
 
 
 def _measure():
@@ -34,7 +61,7 @@ if __name__ == "__main__":
 
 
     server = WSGIServer(("0.0.0.0", 9000), flask_app.wsgi_app)
-    s_p = Process(target=server.serve_forever, args=())
+    s_p = Process(target=server.start, args=())
     s_p.start()
 
     c_p = Process(target=_measure, args=())

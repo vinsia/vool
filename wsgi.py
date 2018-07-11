@@ -1,12 +1,11 @@
 # -*- coding:utf-8 -*-
 from __future__ import unicode_literals
 
+import asyncio
 import socket
 import sys
 from io import StringIO
 from wsgiref.validate import validator
-
-from multiprocessing import Process
 
 BUFFER_SIZE = 4096
 
@@ -19,6 +18,7 @@ class WSGIServer(object):
     server_port = "80"
 
     def __init__(self, address, application):
+        self.loop = None
         self.application = application
         self._socket = sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -28,27 +28,27 @@ class WSGIServer(object):
         host, port = sock.getsockname()[:2]
         WSGIServer.server_name = socket.getfqdn(host)
         WSGIServer.server_port = str(port)
-        self.raw_data = None
         self.status = 200
         self.response_headers = []
 
-    def serve_forever(self):
-        sock = self._socket
+    async def serve_forever(self):
+        loop = self.loop
         while True:
-            client_connection, _ = _sock, addr = sock.accept()
-            self.handle_request(client_connection)
+            client_connection, _ = await loop.sock_accept(self._socket)
+            await self.handle_request(client_connection)
+            # await loop.create_task(self.handle_request(client_connection))
 
-    def handle_request(self, client_connection):
-        self.raw_data = raw_data = client_connection.recv(BUFFER_SIZE)  # TODO: 要全部输入
-        environ = self.parse_data()
+    async def handle_request(self, client_connection):
+        raw_data = await self.loop.sock_recv(client_connection, BUFFER_SIZE)  # TODO: 要全部输入
+        environ = self.parse_data(raw_data)
         result = self.application(environ, self.start_response)
-        self.finish_response(client_connection, result)
+        await self.finish_response(client_connection, result)
 
     def start_response(self, status, response_headers, exc_info=None):
         self.status = status
         self.response_headers = response_headers
 
-    def finish_response(self, client_connection, result):
+    async def finish_response(self, client_connection, result):
         try:
             # TODO: 是否有更好的处理bytes的方法
             response = bytes('HTTP/1.1 {status}\r\n'.format(status=self.status), encoding="utf-8")
@@ -60,12 +60,12 @@ class WSGIServer(object):
                 response += data
             # 迭代器必须关闭？ 为啥?
             result.close()
-            client_connection.sendall(response)
+            await self.loop.sock_sendall(client_connection, response)
         finally:
             client_connection.close()
 
-    def parse_data(self):
-        data = self.raw_data.decode("utf-8")
+    def parse_data(self, raw_data):
+        data = raw_data.decode("utf-8")
         format_data = data.splitlines()
 
         # print(format_data)
@@ -100,6 +100,11 @@ class WSGIServer(object):
         path, parameter_str = path.split("?")
         return path, parameter_str
 
+    def start(self):
+        loop = asyncio.get_event_loop()
+        self.loop = loop
+        loop.run_until_complete(self.serve_forever())
+
 
 if __name__ == "__main__":
     @validator
@@ -116,8 +121,4 @@ if __name__ == "__main__":
 
 
     server = WSGIServer(("0.0.0.0", 9000), application)
-    p = Process(target=server.serve_forever, args=())
-    p.start()
-    p.join()
-    # server = WSGIServer(("0.0.0.0", 9000), application)
-    # server.serve_forever()
+    server.start()
