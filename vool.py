@@ -9,6 +9,7 @@ import uvloop
 from wsgi import WSGIServer
 
 
+# TODO: 路由可以做的更加丰富一点
 class Route(object):
     _route = None
     simple = {}
