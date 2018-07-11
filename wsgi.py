@@ -61,6 +61,9 @@ class WSGIServer(object):
             # 迭代器必须关闭？ 为啥?
             result.close()
             await self.loop.sock_sendall(client_connection, response)
+        except:
+            import traceback
+            traceback.print_exc()
         finally:
             client_connection.close()
 
