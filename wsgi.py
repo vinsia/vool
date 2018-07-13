@@ -7,6 +7,8 @@ from io import StringIO
 
 import uvloop
 
+from http_helper import RawRequest
+
 
 class Response(object):
     def __init__(self):
@@ -40,20 +42,21 @@ class WSGIServer(asyncio.Protocol):
             data = raw_data.decode("utf-8")
             format_data = data.splitlines()
 
-            # print(format_data)
+            print(format_data)
             # 第一行为 'method path version'
-            method, url, http_version = format_data[0].split() if format_data else ["GET", "/", "http 1.0"]
-            path, query_str = parse_parameter(url)
+            request = RawRequest.parse(StringIO(data))
+            print(request)
+            # method, url, http_version = format_data[0].split() if format_data else ["GET", "/", "http 1.0"]
             # https://www.python.org/dev/peps/pep-0333/#environ-variables
             environ = {
-                "REQUEST_METHOD": method,
+                "REQUEST_METHOD": request.method,
                 "SCRIPT_NAME": "",
-                "PATH_INFO": path,
-                "QUERY_STRING": query_str,
+                "PATH_INFO": request.path,
+                "QUERY_STRING": request.query_str,
                 "CONTENT_TYPE": "text/plain",
                 "SERVER_NAME": WSGIServer.server_name,
                 "SERVER_PORT": WSGIServer.server_port,
-                "SERVER_PROTOCOL": http_version,
+                "SERVER_PROTOCOL": request.version,
                 "wsgi.version": (1, 0),
                 "wsgi.url_scheme": "http",
                 "wsgi.input": StringIO(data),
